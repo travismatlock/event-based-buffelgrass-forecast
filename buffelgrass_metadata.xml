@@ -4,10 +4,10 @@
         <citation>
             <citeinfo>
                 <origin>USA National Phenology Network</origin>
-                <pubdate>2019</pubdate>
-                <title>Buffelgrass Pheno Forecast, Arizona, 2023 - Current Year</title>
+                <pubdate>2023</pubdate>
+                <title>Buffelgrass Pheno Forecast, Arizona, 2023 - Current Year, Beta Version</title>
                 <geoform>Raster Digital Data Set</geoform>
-		<onlink>http://dx.doi.org/10.25422/azu.data.14273081.v1</onlink>
+		<onlink>https://travismatlock.shinyapps.io/buffelgrass_forecast/</onlink>
                 <lworkcit>
                     <citeinfo>
                         <origin>USA National Phenology Network</origin>
@@ -23,7 +23,7 @@
             </citeinfo>
         </citation>
         <descript>
-            <abstract>1-2 week forecast for 50% greenness of buffelgrass (Pennisetum ciliare, aka Cenchrus ciliaris) in Arizona. Each pixel is assigned a value based on the number of rainfall events in a 30-day rolling window prior to the date of forecast. A rainfall event is any day with at least 6.35 mm (.25 inches) of precipitation preceded by at least three calendar days each with precipitation below 6.35 mm, the first of which must be 0 mm. A value of 4 predicts 50% greenness in 1-2 weeks from the forecasted date.</abstract>
+            <abstract>1-2 week forecast for 50% greenness of buffelgrass (Pennisetum ciliare, aka Cenchrus ciliaris) in Arizona. Each pixel is assigned a value based on the number of distinct rainfall events in a 30-day rolling window prior to the date of forecast. A rainfall event is any day with at least 6.35 mm (.25 inches) of precipitation preceded by at least three calendar days each with precipitation below 6.35 mm, the first of which must be 0 mm. A value of 4 predicts 50% greenness in 1-2 weeks from the forecasted date.</abstract>
             <purpose>Buffelgrass is a drought-tolerant invasive species in Arizona that can cause significant harm to native biodiversity and increase the severity of wildfires. It is quite difficult to treat, with optimum results following treatment that has occurred at 50% greenness. This forecast allows land managers to predict and prepare for this treatment window.</purpose>
             <supplinf></supplinf>
         </descript>
@@ -210,50 +210,8 @@
                 <cntemail>theresa@usanpn.org</cntemail>
             </cntinfo>
         </distrib>
-        <distliab>Unless otherwise stated, all data, metadata and related materials are considered to satisfy the quality standards relative to the purpose for which the data were collected. Although these data and associated metadata have been reviewed for accuracy and completeness and approved for release by the U.S. Geological Survey (USGS), no warranty expressed or implied is made regarding the display or utility of the data on any other system or for general or scientific purposes, nor shall the act of distribution constitute any such warranty.</distliab>
+        <distliab>
         <stdorder>
-            <digform>
-                <digtinfo>
-                    <formname>Raster Digital Data Set Landing Page</formname>
-                </digtinfo>
-                <digtopt>
-                    <onlinopt>
-                        <computer>
-                            <networka>
-                                <networkr>http://dx.doi.org/10.25422/azu.data.14273081.v1</networkr>
-                            </networka>
-                        </computer>
-                    </onlinopt>
-                </digtopt>
-            </digform>
-            <digform>
-                <digtinfo>
-                    <formname>Raster Digital Data Set Machine Accessible WMS Endpoint</formname>
-                </digtinfo>
-                <digtopt>
-                    <onlinopt>
-                        <computer>
-                            <networka>
-                                <networkr>http://geoserver.usanpn.org/geoserver/wms?request=GetCapabilities</networkr>
-                            </networka>
-                        </computer>
-                    </onlinopt>
-                </digtopt>
-            </digform>
-            <digform>
-                <digtinfo>
-                    <formname>Raster Digital Data Set Machine Accessible WCS Endpoint</formname>
-                </digtinfo>
-                <digtopt>
-                    <onlinopt>
-                        <computer>
-                            <networka>
-                                <networkr>http://geoserver.usanpn.org/geoserver/wcs?request=GetCapabilities</networkr>
-                            </networka>
-                        </computer>
-                    </onlinopt>
-                </digtopt>
-            </digform>
             <fees>None.</fees>
         </stdorder>
     </distinfo>
