@@ -161,22 +161,30 @@ l
 
 
 ui <- fluidPage(
-  
-  # Application title
-  titlePanel("Rainfall Event Based Buffelgrass Forecast"),
-  
-  mainPanel(leafletOutput("mymap")),
-  textOutput("description"),
-  p(),
-  
-)
+  titlePanel("Rainfall Event Based Buffelgrass Forecast -- Beta Version"), # App title
+  sidebarLayout(
+    sidebarPanel(
+      textOutput("description"), # Description of leaflet on left of page
+      imageOutput("logo")),
+    mainPanel(leafletOutput("mymap"))))
 
-# Define server logic required to draw a histogram
+
 server <- function(input, output) {
-  output$description <- renderText("This map combines PRISM raster and RCC-ACIS spatial point precipitation data to track the number
-  of rainfall events in a 30-day rolling window prior to the date of forecast. It is a product of USA-NPN and is intended as a prototype only.
-  Events are counted as any calendar day with rainfall greater than .25 inches and each consecutive day with any precipitation thereafter.
-  Additionally, the first day of the event must be preceded by at least 3 days that are not part of another event.")
+  output$logo <- renderImage({list(src=file.path('USA-NPN-logo-RGB.png'), 
+                                   width = 240, height = 240*21/67
+                                   )}, deleteFile = F) # NPN logo image
+  output$description <- renderText("This map is a product of the USA National Phenology Network
+                                   at the University of Arizona and is intended as a prototype 
+                                   only for the purpose of predicting green up of invasive buffelgrass
+                                   (more at usanpn.org/data/forecasts/Buffelgrass). It
+                                   combines PRISM raster and RCC-ACIS spatial point precipitation
+                                   data to track the number of rainfall events in a 30-day rolling
+                                   window prior to today's date. A rainfall event must exceed 0.25 inches
+                                   in a single calendar day to be counted. It extends until the next 
+                                   calendar day with no precipitation. Following an event, a 
+                                   minimum of 3 consecutive days with precipitation under .25 
+                                   inches is required for the next event over .25 inches to be counted.
+                                   If you have any questions or feedback, please email info@usanpn.org.")
   output$mymap <- renderLeaflet({
     l
   })
