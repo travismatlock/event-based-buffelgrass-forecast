@@ -2,6 +2,7 @@
 
 # This script produces a forecast for buffelgrass green-up based on rainfall events in AZ.
 
+library(httr)
 library(raster)
 library(rgdal)
 library(rnpn)
@@ -16,17 +17,13 @@ library(sf)
 rm(list=ls())
 
 # Establish today's date and the last 30 dates
-# If testing the script, set today as 2022-07-31
+# If testing the script, set today as as_date('2022-07-31')
 today <- today() 
 lookback <- as_date(today - days(30:1))
 
-# Create a list of ppt raster layers for past 30 days
-AZ <- getData(country="USA", level=1) %>%
-  subset(NAME_1=="Arizona") # Obtain AZ borders for masking raster later
-rasters <- list() # Create empty list
-for (past_day in lookback) { #Download and store raster data for past 30 days
-  rasters[as_date(past_day)] <- crop(npn_download_geospatial("climate:prism_ppt", as_date(past_day)), extent(-115, -109, 31.3, 37))
-}
+
+### FUNCTIONS ###
+
 
 # Function that counts events (ppt > 6.35mm) as separated by 3 days no ppt
 wBuffer <- function(vals, na.rm=T) { # This function uses mm as per PRISM data
@@ -113,12 +110,100 @@ wBufferStations <- function(vals, na.rm=T) { # This function uses inches as per 
   return (events)
 }
 
+getRainLogReadings <- function(sdate, edate, offset = 0) {
+  # This function obtains 1000 entries from RainLog gauges
+  # INPUTS:
+  #         sdate: date as char, Start date of observation window
+  #         edate: date as char, End date of observation window
+  #         offset: int as char, index of POST to start at (increment by limit each iteration)
+  
+  headers <- c(
+    'Content-Type' = 'application/json',
+    'Accept' = 'application/json')
+  
+  body = paste0('{
+    "quality": ["Good"],
+    "pagination": {
+      "offset": ',offset,',
+      "limit": 1000
+    },
+    "dateRangeStart": "',sdate,'",
+    "dateRangeEnd": "',edate,'",
+    "region": {
+      "type": "Rectangle",
+      "westLng": -114.8154,
+      "eastLng": -109.0449,
+      "northLat": 31.32917,
+      "southLat": 37.00459
+    }
+  }')
+  raw.reading <- POST('https://rainlog.org/api/1.0/Reading/getFiltered', body = body, add_headers(headers))
+  reading_data <- fromJSON(rawToChar(raw.reading$content))
+  return (reading_data)
+}
+
+getRainLogGauges <- function(sdate, edate, offset = 0) {
+  # This function obtains 1000 entries from RainLog gauges
+  # INPUTS:
+  #         sdate: date as char, Start date of observation window
+  #         edate: date as char, End date of observation window
+  #         offset: int as char, index of POST to start at (increment by limit each iteration)
+  
+  headers <- c(
+    'Content-Type' = 'application/json',
+    'Accept' = 'application/json')
+  
+  body = paste0('{
+    "pagination": {
+      "offset": ',offset,',
+      "limit": 1000
+    },
+    "dateRangeStart": "',sdate,'",
+    "dateRangeEnd": "',edate,'",
+    "region": {
+      "type": "Rectangle",
+      "westLng": -114.8154,
+      "eastLng": -109.0449,
+      "northLat": 31.32917,
+      "southLat": 37.00459
+    }
+  }')
+  raw.gauges <-POST('https://rainlog.org/api/1.0/GaugeRevision/getFiltered', body = body, add_headers(headers))
+  gauges_data <- fromJSON(rawToChar(raw.gauges$content))
+  return (gauges_data)
+}
+
+rainlogPrep <- function(rain_list, dates_list) {
+  # Takes as input: readingDate, rainAmount for sub-array (grouped by gaugeId)
+  new <- data.frame(readingDate = lookback, rainAmount = 0)
+  new[which(as.character(lookback) %in% dates_list),2] <- rain_list
+  val <- wBufferStations(new$rainAmount)
+  return (val)
+}
+
+
+### RASTER LAYER FORECASTING ###
+
+
+# Create a list of ppt raster layers for past 30 days
+AZ <- getData(country="USA", level=1) %>%
+  subset(NAME_1=="Arizona") # Obtain AZ borders for masking raster later
+rasters <- list() # Create empty list
+for (past_day in lookback) { #Download and store raster data for past 30 days
+  rasters[as_date(past_day)] <- crop(npn_download_geospatial("climate:prism_ppt", as_date(past_day)), extent(-115, -109, 31.3, 37))
+}
+
 # Calculate forecast from wBuffer and mask
 stacked_data <- stack(rasters[lookback]) # Create RasterStack of last 30 days precip info
 forecast1 <- calc(stacked_data, fun=wBuffer, na.rm=T) %>% mask(AZ) # Calculate number of rainfall events in past 30 days for each pixel.
 
+
+### RCC-ACIS FORECASTING ###
+
+
 # Obtain and store station data -- used for point locations
-url <- paste0('http://data.rcc-acis.org/MultiStnData?state=AZ&sdate=',as_date(lookback[1]),'&edate=',as_date(today),'&elems=pcpn')
+url <- paste0(
+  'http://data.rcc-acis.org/MultiStnData?state=AZ&sdate=',as_date(lookback[1]),'&edate=',as_date(today),'&elems=pcpn')
 dest <- paste0(getwd(),'/station_data.json') 
 download.file(url, dest)
 station_data <- fromJSON('station_data.json')
@@ -136,9 +221,65 @@ df_stations <- mutate(df_stations, values = station_values) # Assign these value
 df_stations <- filter(df_stations, longitude != 'NULL') # Remove null objects -- they refer to areas such as "Greater Tucson Area"
 df_stations$longitude <- unlist(df_stations$longitude) # Convert longitude from list of length 1 to numeric
 df_stations$latitude <- unlist(df_stations$latitude) # Convert latitude from list of length 1 to numeric
-df_stations <- select(df_stations, -coordinates) # Remove coordinates in c(long, lat) form
+df_stations <- subset(df_stations, select=-coordinates) # Remove coordinates in c(long, lat) form
 df_stations$values <- unlist(df_stations$values) # Convert values from single-item list to numeric
 write.csv(df_stations, file = 'stations.csv') # Write usable data into csv
+
+
+### RAINLOG FORECASTING ###
+
+
+# Initialize Readings array w/ first 1000
+readings <- getRainLogReadings(lookback[1], lookback[(length(lookback))], "0")
+i <- 1000
+# Loop and iterate, calling API function for each 1000 entries until no more available entries
+# (because array length %% is not 1000)
+while (length(readings[[1]]) %% 1000 == 0) {
+  temp_readings <- getRainLogReadings(lookback[1], lookback[(length(lookback))], as.character(i))
+  i = i + 1000
+  readings <- rbind(readings, temp_readings)
+}
+
+# Initialize gauges array and loop until complete
+gauges <- getRainLogGauges(lookback[1], lookback[(length(lookback))], "0")
+# Get vectorized columns for latitude and longitude and drop data frame column for rbind ERROR
+gauges$latitude <- gauges$position$lat
+gauges$longitude <- gauges$position$lng
+gauges <- gauges[, -7]
+
+i <- 1000
+while (length(gauges[[1]]) %% 1000 == 0) {
+  temp_gauges <- getRainLogGauges(lookback[1], lookback[(length(lookback))], as.character(i))
+  temp_gauges$latitude <- temp_gauges$position$lat
+  temp_gauges$longitude <- temp_gauges$position$lng
+  temp_gauges <- temp_gauges[, -7]
+  i = i + 1000
+  gauges <- rbind(gauges, temp_gauges)
+}
+
+# Arrange both gauges and readings arrays by gaugeId
+readings <- arrange(readings, gaugeId)
+gauges <- arrange(gauges, gaugeId)
+
+# Prep gauges for use
+gauges1 <- group_by(gauges, gaugeId) %>%
+  summarize(latitude = mean(latitude), longitude = mean(longitude))
+
+# Calculate forecast values for each gaugeId in rainlog
+rainlog <- group_by(readings, gaugeId) %>%
+  summarize(forecast_value = rainlogPrep(rainAmount, readingDate)) %>%
+  mutate(source = 'RainLog')
+
+# Add latitude and longitude to rainlog data frame
+rllat <- replicate(length(rainlog$gaugeId), NA)
+rllng <- replicate(length(rainlog$gaugeId), NA)
+rllat[which(rainlog$gaugeId %in% gauges1$gaugeId)] <- gauges1$latitude[which(gauges1$gaugeId %in% rainlog$gaugeId)]
+rllng[which(rainlog$gaugeId %in% gauges1$gaugeId)] <- gauges1$longitude[which(gauges1$gaugeId %in% rainlog$gaugeId)]
+rainlog <- mutate(rainlog, lat=rllat, lng = rllng)
+
+
+### CREATE LEAFLET ###
+
 
 # Initialize objects needed for leaflet
 factors <- as.factor(c(0,1,2,3,4))
@@ -150,14 +291,16 @@ l <- leaflet() %>%
   addRasterImage(forecast1, colors = color_obj, opacity=.8, project=F) %>% #Overplot the forecast
   addLegend(pal= color_obj, values=levels(factors), opacity = .8, title='# of Events') %>% # Include legend 
   addCircles(data=stations, lng= ~longitude, lat= ~latitude, # Overplot station data
-             stroke = T, color='black', weight = 1, radius = 750,
+             stroke = T, color='black', weight = 1, radius = 250,
              fillColor = ~color_obj(values), fillOpacity = .8, 
-             popup = ~name) # Allow to click on points and bring up station names
-l
+             popup = ~name) #%>% # Allow to click on points and bring up station names
+  #addCircles(data=rainlog, lng= ~lng, lat= ~lat, # Overplot station data
+  #           stroke = T, color='black', weight = 1, radius = 250,
+  #           fillColor = ~color_obj(forecast_value), fillOpacity = .8, 
+  #           popup = 'RainLog')
 
 
-
-
+### PRODUCE SHINY APP ###
 
 
 ui <- fluidPage(
